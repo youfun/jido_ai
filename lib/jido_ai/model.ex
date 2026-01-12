@@ -74,7 +74,7 @@ defmodule Jido.AI.Model do
       iex> Jido.AI.Model.from(%Jido.AI.Model{provider: :openai, model: "gpt-4"})
       {:ok, %Jido.AI.Model{provider: :openai, model: "gpt-4", ...}}
   """
-  @spec from(term()) :: {:ok, ReqLLM.Model.t()} | {:error, String.t()}
+  @spec from(term()) :: {:ok, t()} | {:error, String.t()}
   def from(input) do
     case input do
       # Already a ReqLLM.Model struct
@@ -98,30 +98,26 @@ defmodule Jido.AI.Model do
         model_name = Keyword.get(opts, :model)
 
         if model_name do
-          case ReqLLM.Model.from({provider, model_name, opts}) do
-            {:ok, reqllm_model} ->
-              # Wrap in Jido.AI.Model struct to preserve base_url/api_key
-              base_url = Keyword.get(opts, :base_url)
-              api_key = Keyword.get(opts, :api_key)
+          # Extract options
+          base_url = Keyword.get(opts, :base_url)
+          api_key = Keyword.get(opts, :api_key)
+          temperature = Keyword.get(opts, :temperature)
+          max_tokens = Keyword.get(opts, :max_tokens)
+          max_retries = Keyword.get(opts, :max_retries, 0)
 
-              jido_model = %__MODULE__{
-                provider: reqllm_model.provider,
-                model: reqllm_model.model,
-                reqllm_id: "#{reqllm_model.provider}:#{reqllm_model.model}",
-                max_tokens: reqllm_model.max_tokens,
-                max_retries: reqllm_model.max_retries,
-                base_url: base_url,
-                api_key: api_key,
-                capabilities: reqllm_model.capabilities,
-                modalities: reqllm_model.modalities,
-                cost: reqllm_model.cost
-              }
-              
-              {:ok, jido_model}
+          # Build Jido.AI.Model struct directly with all options preserved
+          jido_model = %__MODULE__{
+            provider: provider,
+            model: model_name,
+            reqllm_id: "#{provider}:#{model_name}",
+            base_url: base_url,
+            api_key: api_key,
+            temperature: temperature || 0.7,
+            max_tokens: max_tokens || 1024,
+            max_retries: max_retries
+          }
 
-            error ->
-              error
-          end
+          {:ok, jido_model}
         else
           {:error, "model option is required for provider #{provider}"}
         end

@@ -301,20 +301,27 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
       |> add_opt_if_present(:frequency_penalty, params.frequency_penalty)
       |> add_opt_if_present(:presence_penalty, params.presence_penalty)
 
+    # Debug: Log the model structure
+    IO.puts("🔍 DEBUG - Model structure: #{inspect(model, pretty: true, limit: :infinity)}")
+
     # Check for base_url/api_key in model
     base_opts =
       case model do
         %Jido.AI.Model{base_url: base_url} when is_binary(base_url) and base_url != "" ->
+          IO.puts("✅ Adding base_url to options: #{base_url}")
           Keyword.put(base_opts, :base_url, base_url)
         _ ->
+          IO.puts("❌ No base_url found in model (type: #{inspect(model.__struct__)})")
           base_opts
       end
 
     base_opts =
       case model do
         %Jido.AI.Model{api_key: api_key} when is_binary(api_key) and api_key != "" ->
+          IO.puts("✅ Adding api_key to options")
           Keyword.put(base_opts, :api_key, api_key)
         _ ->
+          IO.puts("❌ No api_key found in model")
           base_opts
       end
 
@@ -339,6 +346,7 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
       end
 
     # ReqLLM handles authentication internally via environment variables
+    IO.puts("🎯 Final req_options: #{inspect(opts_with_tools, pretty: true)}")
     {:ok, opts_with_tools}
   end
 
