@@ -87,11 +87,41 @@ defmodule Jido.AI.Model do
 
       # A provider tuple
       {provider, opts} when is_atom(provider) and is_list(opts) ->
+        # Handle pseudo-providers for OpenAI compatible endpoints
+        provider =
+          case provider do
+            :openai_compatible -> :openai
+            :ollama -> :openai
+            _ -> provider
+          end
+
         model_name = Keyword.get(opts, :model)
 
         if model_name do
-          # Use ReqLLM.Model directly
-          ReqLLM.Model.from({provider, model_name, opts})
+          case ReqLLM.Model.from({provider, model_name, opts}) do
+            {:ok, reqllm_model} ->
+              # Wrap in Jido.AI.Model struct to preserve base_url/api_key
+              base_url = Keyword.get(opts, :base_url)
+              api_key = Keyword.get(opts, :api_key)
+
+              jido_model = %__MODULE__{
+                provider: reqllm_model.provider,
+                model: reqllm_model.model,
+                reqllm_id: "#{reqllm_model.provider}:#{reqllm_model.model}",
+                max_tokens: reqllm_model.max_tokens,
+                max_retries: reqllm_model.max_retries,
+                base_url: base_url,
+                api_key: api_key,
+                capabilities: reqllm_model.capabilities,
+                modalities: reqllm_model.modalities,
+                cost: reqllm_model.cost
+              }
+              
+              {:ok, jido_model}
+
+            error ->
+              error
+          end
         else
           {:error, "model option is required for provider #{provider}"}
         end

@@ -206,7 +206,7 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
   end
 
   defp validate_model(%ReqLLM.Model{} = model), do: {:ok, model}
-  defp validate_model(%Model{} = model), do: Model.from(model)
+  defp validate_model(%Model{} = model), do: {:ok, model} # Keep Jido model structure if valid
   defp validate_model(spec) when is_tuple(spec), do: Model.from(spec)
 
   defp validate_model(other) do
@@ -290,7 +290,7 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
 
   defp parse_data_url(_), do: {:error, :not_data_url}
 
-  defp build_req_llm_options(_model, params) do
+  defp build_req_llm_options(model, params) do
     # Build base options
     base_opts =
       []
@@ -300,6 +300,23 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
       |> add_opt_if_present(:stop, params.stop)
       |> add_opt_if_present(:frequency_penalty, params.frequency_penalty)
       |> add_opt_if_present(:presence_penalty, params.presence_penalty)
+
+    # Check for base_url/api_key in model
+    base_opts =
+      case model do
+        %Jido.AI.Model{base_url: base_url} when is_binary(base_url) and base_url != "" ->
+          Keyword.put(base_opts, :base_url, base_url)
+        _ ->
+          base_opts
+      end
+
+    base_opts =
+      case model do
+        %Jido.AI.Model{api_key: api_key} when is_binary(api_key) and api_key != "" ->
+          Keyword.put(base_opts, :api_key, api_key)
+        _ ->
+          base_opts
+      end
 
     # Add tools if provided
     opts_with_tools =
@@ -330,7 +347,12 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
 
   defp call_reqllm(model, messages, req_options, params) do
     # Build model spec string from ReqLLM.Model
-    model_spec = "#{model.provider}:#{model.model}"
+    model_spec = 
+      case model do
+        %Jido.AI.Model{reqllm_id: reqllm_id} when is_binary(reqllm_id) -> reqllm_id
+        %Jido.AI.Model{provider: provider, model: name} -> "#{provider}:#{name}"
+        %{provider: provider, model: name} -> "#{provider}:#{name}"
+      end
 
     if params.stream do
       call_streaming(model_spec, messages, req_options)
